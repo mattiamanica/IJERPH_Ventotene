@@ -1,6 +1,10 @@
 
 
 
+# load packages
+library(here)
+library(tidyverse)
+
 # import data
 
 db <- read.table(paste(here(),"submission","Database_Ventotene_2014.txt",sep="/"),
@@ -51,7 +55,7 @@ table(db$IDsite,db$SiteID)
 ggplot(db,aes(Long,Lat))+geom_point(col="white")+
   geom_text(aes(Long,Lat,label=IDsite))+theme_bw()
 
-
+library(rgeos)
 bbx <- readWKT("POLYGON((365000 4516000, 368000 4516000, 368000 4518600, 365000 4516000))") 
 proj4string(bbx) <- crsutm
 
@@ -89,17 +93,49 @@ utm.build <- spTransform(build,proj4string(vent))
 plot(vent)
 plot(utm.build,add=T)
 
-# define a radius around each trap
-radius = 250
-area = radius*radius*pi
-btrap <- gBuffer(utm.trap,width=radius,byid=T)
+# defi ne a radius around each trap
+radius <- 250
+area   <- radius*radius*pi
+btrap  <- gBuffer(utm.trap,width=radius,byid=T)
 
 plot(vent)
 plot(utm.trap,add=T)
 plot(btrap,add=T)
 
 
-# exploratory analysis
+# transform spatialLine to spatialPolygon
+
+library(sf)
+vent2     <- st_as_sf(vent) 
+vent.pol  <- st_polygonize(vent2)
+ventotene <- as(vent.pol, "Spatial") # If you want sp
+class(ventotene)
+
+ventotene2 <- spTransform(ventotene,crsutm)#gUnaryUnion(ventotene)
+proj4string(ventotene2)
+proj4string(btrap)
+
+
+# cut off area in the sea and compute % of buildings in the area
+
+# example
+btrapnosea <- gIntersection(ventotene2,btrap[1],byid=TRUE)
+build.buff <- gIntersection(utm.build,btrapnosea,byid=TRUE)
+plot(ventotene2);plot(btrapnosea,add=T);plot(build.buff,add=T)
+
+db$build <- NA
+for(i in 1:nrow(db)){
+  btrapnosea  <- gIntersection(ventotene2,btrap[i],byid=TRUE)
+  area        <- gArea(btrapnosea)
+  build.buff  <- gIntersection(utm.build,btrapnosea,byid=TRUE)
+  buildings   <- gArea(build.buff)
+  db$build[i] <- buildings/area
+}
+
+
+
+
+# exploratory analysis ###########################
 
 summary(db)
 
@@ -109,9 +145,11 @@ table(db$week,db$SiteID)
 
 # mosquito capture distribution
 
-db %>% ggplot(.,aes(value))+facet_wrap(~Species)+geom_histogram()+  theme_bw()
-db %>% ggplot(.,aes(value))+facet_wrap(Species~SiteID)+geom_histogram()+  theme_bw()
+db %>% ggplot(.,aes(value))+
+  facet_wrap(~Species)+geom_histogram()+  theme_bw()
 
+db %>% ggplot(.,aes(value))+
+  facet_wrap(Species~IDsite)+geom_histogram()+  theme_bw()
 
 # % of zeroes
 
@@ -150,24 +188,69 @@ db %>% group_by(Species,week) %>% summarise(Tot = sum(value)) %>%
 
 
 
-# mosquito dynamics by site
+# mosquito dynamics (spatio/temporal)
 
 db %>% ggplot(., aes(x=week,y=value,col=Species))+
-  facet_wrap(~SiteID)+
+  facet_wrap(~IDsite)+
   geom_point()+  theme_bw()
 
 
+db %>% group_by(IDsite,Long,Lat)%>%
+  summarise(Tot = sum(value))%>%
+  ggplot(.)+
+    geom_point(aes(x=Long,y=Lat,size=Tot))+  theme_bw()
+
+
+db %>% filter(Species == "Aedes") %>% group_by(IDsite,Long,Lat)%>%
+  summarise(Tot = sum(value))%>%
+  ggplot(.)+
+  geom_point(aes(x=Long,y=Lat,size=Tot))+  theme_bw()
+
+
+db %>% filter(Species == "Culex") %>% group_by(IDsite,Long,Lat)%>%
+  summarise(Tot = sum(value))%>%
+  ggplot(.)+
+  geom_point(aes(x=Long,y=Lat,size=Tot))+  theme_bw()
 
 
 
+db %>% group_by(Species,IDsite) %>% summarise(Tot = sum(value))%>%
+ggplot(., aes(x=IDsite,y=Tot))+ theme_bw()+
+  geom_bar(stat="identity",col="black",fill="grey60")+
+  facet_grid( ~Species)+
+  labs(x = "ID Trap", 
+       y = "N? of trapped mosquito")  +
+  theme_bw()  +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(colour = "grey60",linetype = "dashed"),
+        plot.title = element_text(size = rel(1.5), 
+                                  face = "bold", vjust = 1.5),
+        axis.title = element_text(face = "bold"),
+        axis.title.y = element_text(vjust= 1.8),
+        axis.title.x = element_text(vjust= -0.5),
+        strip.background =  element_rect(fill="white"),
+        strip.text.x = element_text(size=15,face="italic")
+  )
 
 
-
-
-
-
-
-
+library(ggridges)
+db %>% group_by(Species,IDsite,week) %>% summarise(Tot = sum(value))%>%
+  ggplot(., aes(x=IDsite,y=week,height= Tot,group =week))+ theme_bw()+
+  geom_ridgeline(alpha=0.75)+
+  facet_grid( ~Species)+
+  labs(x = "ID Trap", 
+       y = "N? of trapped mosquito")  +
+  theme_bw()  +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(colour = "grey60",linetype = "dashed"),
+        plot.title = element_text(size = rel(1.5), 
+                                  face = "bold", vjust = 1.5),
+        axis.title = element_text(face = "bold"),
+        axis.title.y = element_text(vjust= 1.8),
+        axis.title.x = element_text(vjust= -0.5),
+        strip.background =  element_rect(fill="white"),
+        strip.text.x = element_text(size=15,face="italic")
+  )
 
 
 
