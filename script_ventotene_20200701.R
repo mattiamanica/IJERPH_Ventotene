@@ -525,7 +525,14 @@ plotDiff(s1 = sm(m3, 1), s2 = sm(m3, 2)) + l_ciPoly() +
 
 
 # probability of zero presence
-newdb$zerop <- ppois(0,lambda = newdb$fit)
+
+# check how size is computed in gam
+# x <- rnbinom(1000, mu = 5,size =0.5)
+# y <- rnorm(1000, mean =0 ,sd =3)
+# mm <- gam(x~s(y),family = nb())
+# summary(mm)
+
+newdb$zerop <- dnbinom(0,mu = newdb$fit,size = 0.435)
 
 
 dbfig3a <- newdb %>% filter(Species == "Aedes",build %in% c(0,0.05,0.1,0.15,0.2))
