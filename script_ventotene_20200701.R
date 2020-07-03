@@ -131,7 +131,7 @@ for(i in 1:nrow(db)){
   area        <- gArea(btrapnosea)
   build.buff  <- gIntersection(utm.build,btrapnosea,byid=TRUE)
   buildings   <- gArea(build.buff)
-  db$build[i] <- buildings/area
+  db$build[i] <- 100*buildings/area
 }
 
 db %>%group_by(IDsite,build)%>%count()%>%arrange(build)
@@ -306,11 +306,42 @@ db %>% filter(Species == "Culex") %>% group_by(IDsite,Long,Lat)%>%
   ggplot(.)+
   geom_point(aes(x=Long,y=Lat,size=Tot))+  theme_bw()
 
+# first detection
+
+db %>% group_by(Species,week) %>% summarise(det = sum(value>0)) %>%
+  filter(week <25)
+
+db %>% group_by(Species,week,IDsite) %>% summarise(det = sum(value>0)) %>%
+  filter(week ==21)
+
+db %>% group_by(Species,week,IDsite) %>% summarise(det = sum(value>0)) %>%
+  filter(week ==18)
+# 
+# f1b <- db %>% group_by(Species,IDsite) %>% summarise(Tot  = sum(value),
+#                                                      Mean = mean(value))%>%
+# ggplot(., aes(x=IDsite,y=Mean))+ theme_bw()+
+#   geom_bar(stat="identity",col="black",fill="grey60")+
+#   facet_grid( ~Species)+
+#   labs(x = "ID Site", 
+#        y = "N° of trapped mosquito")  +
+#   theme_bw()  +
+#   theme(panel.grid.major.x = element_blank(),
+#         panel.grid.major.y = element_line(colour = "grey60",linetype = "dashed"),
+#         plot.title = element_text(size = rel(1.5), 
+#                                   face = "bold", vjust = 1.5),
+#         axis.title = element_text(face = "bold"),
+#         axis.title.y = element_text(vjust= 1.8),
+#         axis.title.x = element_text(vjust= -0.5),
+#         strip.background =  element_rect(fill="white"),
+#         strip.text.x = element_text(size=15,face="italic")
+#   )
+# f1b
 
 
-f1b <- db %>% group_by(Species,IDsite) %>% summarise(Tot = sum(value))%>%
-ggplot(., aes(x=IDsite,y=Tot))+ theme_bw()+
-  geom_bar(stat="identity",col="black",fill="grey60")+
+f1b <-   ggplot(db, aes(IDsite))+  # facet_grid( ~Species)+
+  stat_summary(aes(y = value), fun = "mean", geom = "bar",fill = "grey70",col="black")+
+  stat_summary(aes(y = value),geom="errorbar",fun.data = "mean_cl_boot", 
+               colour = "black",width=0.1)+
   facet_grid( ~Species)+
   labs(x = "ID Site", 
        y = "N° of trapped mosquito")  +
@@ -350,7 +381,7 @@ db %>% group_by(Species,IDsite,week) %>% summarise(Tot = sum(value))%>%
   )
 
 
-db$Species_site <- factor(paste(db$Species,db$IDSite,sep="_"))
+db$Species_site <- factor(paste(db$Species,db$IDsite,sep="_"))
 
 db %>% ggplot(.,aes(x=IDsite,y=value,fill=Species))+geom_boxplot()+
   labs(x = "ID Site", 
@@ -393,7 +424,6 @@ m1 <- gam(value ~ Species+build+Species:build+
 sum(resid(m1,type="pearson")^2)/(m1$df.residual)
 
 # negative binomial distribution
-library(MASS)
 m2 <- gam(value ~ Species+build+Species:build+
             s(week,by=Species) , 
           family = nb(), data = db)
@@ -441,11 +471,18 @@ plot(vario,pch=19)
 # model results
 summary(m2)
 
+# increase from natural to urban gradient (albopcitus)
+nat <- exp(coef(m2)[1] + coef(m2)[3]*0)
+urb <- exp(coef(m2)[1] + coef(m2)[3]*20)
 
+urb/nat
+
+
+
+# plotting results
 par(mfrow=c(1,2))
 plot(m2)
 
-# plotting results
 
 newdb <- expand.grid(week = seq(min(db$week),max(db$week),by=1),
                      Species = levels(db$Species),
