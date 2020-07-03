@@ -462,24 +462,49 @@ range(db$week)
 f2a <- newdb %>% filter(week%in% c(35))%>%
   ggplot(.,aes(100*build,fit,col=Species))+
   geom_ribbon(aes(x=100*build,ymin= lo,ymax=hi,fill=Species),col="white",alpha=0.2)+
-  geom_line()+theme_bw()+
+  geom_line()+
   xlab("% Area covered by buildings")+
   ylab("Mean mosquito abundance")+theme(legend.position = "top")+
   scale_fill_manual(values = diverge_hcl(2))+
   scale_color_manual(values = diverge_hcl(2))+
-  ylim(c(0,23))
+  ylim(c(0,23))+ 
+  theme_bw()  +
+  theme(legend.position = "top",
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(colour = "grey60",linetype = "dashed"),
+        plot.title = element_text(size = rel(1.5), 
+                                  face = "bold", vjust = 1.5),
+        axis.title = element_text(face = "bold"),
+        axis.title.y = element_text(vjust= 1.8),
+        axis.title.x = element_text(vjust= -0.5),
+        strip.background =  element_rect(fill="white"),
+        strip.text.x = element_text(size=15,face="italic")
+  )
 
-
+f2a
 
 f2b <- newdb %>% filter(build == 0.1)%>%
   ggplot(.,aes(week,fit,col=Species))+
   geom_ribbon(aes(x=week,ymin= lo,ymax=hi,fill=Species),col="white",alpha=0.2)+
-  geom_line()+theme_bw()+
+  geom_line()+
   xlab("Week")+
-  ylab("Mean mosquito abundance")+theme(legend.position = "top")+
+  ylab("Mean mosquito abundance")+
   scale_fill_manual(values = diverge_hcl(2))+
   scale_color_manual(values = diverge_hcl(2))+
-  ylim(c(0,23))
+  ylim(c(0,23)) +
+  theme_bw()  +
+  theme(legend.position = "top",
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(colour = "grey60",linetype = "dashed"),
+        plot.title = element_text(size = rel(1.5), 
+                                  face = "bold", vjust = 1.5),
+        axis.title = element_text(face = "bold"),
+        axis.title.y = element_text(vjust= 1.8),
+        axis.title.x = element_text(vjust= -0.5),
+        strip.background =  element_rect(fill="white"),
+        strip.text.x = element_text(size=15,face="italic")
+  )
+f2b
 
 
 
@@ -499,10 +524,62 @@ plotDiff(s1 = sm(m3, 1), s2 = sm(m3, 2)) + l_ciPoly() +
 
 
 
+# probability of zero presence
+newdb$zerop <- ppois(0,lambda = newdb$fit)
 
 
+dbfig3a <- newdb %>% filter(Species == "Aedes",build %in% c(0,0.05,0.1,0.15,0.2))
+dbfig3b <- newdb %>% filter(Species == "Culex",build %in% c(0.1))
 
+f3 <-  ggplot()+
+    geom_line(data= dbfig3a,aes(week,1-zerop,col=factor(100*build)))+
+    geom_line(data= dbfig3b,aes(week,1-zerop),col="black",linetype="dashed")+
+    xlab("Week")+
+  ylab("Probability of observing a mosquito")+
+  scale_fill_manual(values = diverge_hcl(5))+
+  scale_color_manual(values = diverge_hcl(5))+
+  ylim(c(0,1))+
+  theme_bw()  +
+  theme(legend.position = "top",
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(colour = "grey60",linetype = "dashed"),
+        plot.title = element_text(size = rel(1.5), 
+                                  face = "bold", vjust = 1.5),
+        axis.title = element_text(face = "bold"),
+        axis.title.y = element_text(vjust= 1.8),
+        axis.title.x = element_text(vjust= -0.5),
+        strip.background =  element_rect(fill="white"),
+        strip.text.x = element_text(size=15,face="italic")
+  )+
+  guides(col =guide_legend(title="% Area covered by buildings"))
+f3
 
+ggsave(f3, filename = "fig3.pdf",width = 6, height = 5,dpi=600)
+
+# 
+# f2d <- newdb %>% filter(Species == "Culex",build %in% c(0,0.05,0.1,0.15,0.2))%>%
+#   ggplot(.,aes(week,zerop,col=factor(100*build)))+
+#   geom_line(size=1.1)+
+#   xlab("Week")+
+#   ylab(expression(paste("Probability of observing ", italic(" Cx. pipiens"))))+
+#   scale_fill_manual(values = diverge_hcl(5))+
+#   scale_color_manual(values = diverge_hcl(5))+
+#   ylim(c(0,1))+
+#   theme_bw()  +
+#   theme(legend.position = "top",
+#         panel.grid.major.x = element_blank(),
+#         panel.grid.major.y = element_line(colour = "grey60",linetype = "dashed"),
+#         plot.title = element_text(size = rel(1.5), 
+#                                   face = "bold", vjust = 1.5),
+#         axis.title = element_text(face = "bold"),
+#         axis.title.y = element_text(vjust= 1.8),
+#         axis.title.x = element_text(vjust= -0.5),
+#         strip.background =  element_rect(fill="white"),
+#         strip.text.x = element_text(size=15,face="italic")
+#   )+
+#   guides(col =guide_legend(title="% Area covered by buildings"))
+# 
+# f2d
 
 
 
