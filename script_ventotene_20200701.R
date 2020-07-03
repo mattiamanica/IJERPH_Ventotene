@@ -181,6 +181,23 @@ length(unique(db$week))
 # samplings where
 length(unique(db$SiteID))
 
+# trap position
+
+
+trap.pos  <-db %>% group_by(Long,Lat) %>% count() 
+
+trap.dist  <- spDists(as.matrix(trap.pos[,1:2]),longlat = T)*1000 #km to m
+trap.dist2 <- trap.dist[lower.tri(trap.dist)]
+hist(trap.dist2,breaks = 5)
+plot(trap.dist2)
+median(trap.dist2);mean(trap.dist2);max(trap.dist2);min(trap.dist2)
+
+which.min.pos <- function(x){ which.min(x[x>0])}
+apply(trap.dist,2,which.min.pos)
+mean(c(208.7258,291.9419,378.4361,317.5654,161.0367,236.2301))
+median(c(208.7258,291.9419,378.4361,317.5654,161.0367,236.2301))
+
+
 
 db %>% group_by(Species) %>% 
   summarise(Tot    = sum(value),
@@ -478,6 +495,58 @@ set.seed(20200702)
 m3 <- getViz(m2)
 plotDiff(s1 = sm(m3, 1), s2 = sm(m3, 2)) + l_ciPoly() + 
   l_fitLine() + geom_hline(yintercept = 0, linetype = 2)
+
+
+
+
+
+
+
+
+
+
+
+# radius sensitivity
+
+# defi ne a radius around each trap
+radius <- seq(50,500,by=50)
+res.rad <- array(NA,dim = c(4,2,length(radius)))
+for(j in 1:length(radius)){
+area   <- radius*radius[j]*pi
+btrap  <- gBuffer(utm.trap,width=radius[j],byid=T)
+
+db$build <- NA
+for(i in 1:nrow(db)){
+  btrapnosea  <- gIntersection(ventotene2,btrap[i],byid=TRUE)
+  area        <- gArea(btrapnosea)
+  build.buff  <- gIntersection(utm.build,btrapnosea,byid=TRUE)
+  if(length(build.buff) >0 ){
+  buildings   <- gArea(build.buff)
+  db$build[i] <- buildings/area}else{db$build[i] = 0}
+}
+
+mod <- gam(value ~ Species+build+Species:build+
+            s(week,by=Species) , 
+            family = nb(), data = db)
+
+res.rad[,1,j] <-  summary(mod)$p.coef
+res.rad[,2,j] <-  summary(mod)$p.pv
+}
+
+# parameters are significant?
+apply(res.rad[,2,]<0.05,1,sum)
+# intercept / Species / buildings / interaction
+res.rad[,2,]<0.05
+# buildings not significant when radius <= 150
+# interaction not signifant whan radius <= 200
+
+
+# parameters sign similar?
+# intercept / Species / buildings / interaction
+res.rad[,1,]
+# buildings consistently positive when radius > 50
+# interaction consistently negative when radius > 100
+
 
 
 
