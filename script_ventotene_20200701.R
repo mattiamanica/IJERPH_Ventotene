@@ -486,7 +486,7 @@ plot(m2)
 
 newdb <- expand.grid(week = seq(min(db$week),max(db$week),by=1),
                      Species = levels(db$Species),
-                     build = seq(0,0.2,by=0.01))
+                     build = seq(0,20,by=1))
 
 dim(newdb) 
 
@@ -497,8 +497,8 @@ newdb$lo  <- exp(predict(m2,newdata = newdb) - 1.96* predict(m2,newdata = newdb,
 range(db$week)
 
 f2a <- newdb %>% filter(week%in% c(35))%>%
-  ggplot(.,aes(100*build,fit,col=Species))+
-  geom_ribbon(aes(x=100*build,ymin= lo,ymax=hi,fill=Species),col="white",alpha=0.2)+
+  ggplot(.,aes(build,fit,col=Species))+
+  geom_ribbon(aes(x=build,ymin= lo,ymax=hi,fill=Species),col="white",alpha=0.2)+
   geom_line()+
   xlab("% Area covered by buildings")+
   ylab("Mean mosquito abundance")+theme(legend.position = "top")+
@@ -520,7 +520,7 @@ f2a <- newdb %>% filter(week%in% c(35))%>%
 
 f2a
 
-f2b <- newdb %>% filter(build == 0.1)%>%
+f2b <- newdb %>% filter(build == 10)%>%
   ggplot(.,aes(week,fit,col=Species))+
   geom_ribbon(aes(x=week,ymin= lo,ymax=hi,fill=Species),col="white",alpha=0.2)+
   geom_line()+
@@ -572,12 +572,12 @@ plotDiff(s1 = sm(m3, 1), s2 = sm(m3, 2)) + l_ciPoly() +
 newdb$zerop <- dnbinom(0,mu = newdb$fit,size = 0.435)
 
 
-dbfig3a <- newdb %>% filter(Species == "Aedes",build %in% c(0,0.05,0.1,0.15,0.2))
-dbfig3b <- newdb %>% filter(Species == "Culex",build %in% c(0.1))
+dbfig3a <- newdb %>% filter(Species == "Aedes",build %in% c(0,5,10,15,20))
+dbfig3b <- newdb %>% filter(Species == "Culex",build %in% c(10))
 
 f3 <-  ggplot()+
-    geom_line(data= dbfig3a,aes(week,1-zerop,col=factor(100*build)))+
-    geom_line(data= dbfig3b,aes(week,1-zerop),col="black",linetype="dashed")+
+    geom_line(data= dbfig3a,aes(week,1-zerop,col=factor(build)),size=1.1)+
+    geom_line(data= dbfig3b,aes(week,1-zerop),col="black",linetype="solid",size=1.1)+
     xlab("Week")+
   ylab("Probability of observing a mosquito")+
   scale_fill_manual(values = diverge_hcl(5))+
