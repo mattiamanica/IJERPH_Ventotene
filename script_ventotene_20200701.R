@@ -72,22 +72,35 @@ plot(vent)
 # compute human presence nearby traps
 
 # obtain openstreetmap data
-library(osmar)
-src <- osmsource_api(url = "https://api.openstreetmap.org/api/0.6/")
+# library(osmar)
+# src <- osmsource_api(url = "https://api.openstreetmap.org/api/0.6/")
+# 
+# bb <- corner_bbox(13.3949,40.7828,13.4485,40.8060)
+# ua <- get_osm(bb, source = src)
+# 
+# 
+# ll_poly <- as_sp(ua, "polygons")
+# spplot(ll_poly, c("version"))
+# 
+# # identify buildings
+# bg_ids <- find(ua, way(tags(k %in% c("building"))))
+# bg_ids <- find_down(ua, way(bg_ids))
+# # buildings 
+# bg     <- subset(ua, ids = bg_ids)
+# build  <- as_sp(bg, "polygons")
 
-bb <- corner_bbox(13.3949,40.7828,13.4485,40.8060)
-ua <- get_osm(bb, source = src)
+library(osmdata)
 
+#getbb("Ventotene") %>%
+q <-   opq(bbox = 'Ventotene')  %>%
+  add_osm_feature(key = 'building') %>%
+  osmdata_sp()
+q
+sp::plot(q$osm_polygons)
+build <- q$osm_polygons
+proj4string(build)
 
-ll_poly <- as_sp(ua, "polygons")
-spplot(ll_poly, c("version"))
-
-# identify buildings
-bg_ids <- find(ua, way(tags(k %in% c("building"))))
-bg_ids <- find_down(ua, way(bg_ids))
-# buildings 
-bg     <- subset(ua, ids = bg_ids)
-build  <- as_sp(bg, "polygons")
+save(build, file = "Building.RData")
 
 # change reference system
 utm.build <- spTransform(build,proj4string(vent))
