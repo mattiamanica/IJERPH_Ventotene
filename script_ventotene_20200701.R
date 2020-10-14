@@ -34,7 +34,8 @@ crsp   = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0")
 crsutm = CRS("+proj=utm +zone=33 +datum=WGS84 +units=m +no_defs") # CRS procida
 
 # import region Lazion coastline
-lazio <- readOGR(dsn="dati/Linea_costa_WGS84-33_12.shp")
+shp <- paste(here(),"dati","Linea_costa_WGS84-33_12.shp",sep="/")
+lazio <- readOGR(dsn=shp,layer  = basename(strsplit(shp, "\\.")[[1]])[1])
 proj4string(lazio) <- crsutm
 
 utm.trap <- spTransform(SpatialPoints(list(
@@ -147,7 +148,9 @@ for(i in 1:nrow(db)){
   db$build[i] <- 100*buildings/area
 }
 
-db %>%group_by(IDsite,build)%>%count()%>%arrange(build)
+db %>%group_by(IDsite,build)%>%count()%>%arrange(build) %>%
+  transform(build = round(build,2))%>%
+  write.table(., sep="|",quote=F,row.names=F, file = paste(here(),"build_perc.txt",sep="/"))
 
 
 btrapnosea  <- gIntersection(ventotene2,btrap,byid=TRUE)
@@ -682,7 +685,194 @@ res.rad[,1,]
 # interaction consistently negative when radius > 100
 
 
+tableS1 <- as.data.frame(t(round(res.rad[,2,],5)))
+names(tableS1) <- c("intercept" , "Species" , "buildings" , "interaction")
+
+tableS1 <- tableS1%>% 
+  add_column(Radius = paste(radius,"m",sep=""),
+             .before = "intercept")
+tableS1
+
+write.table(tableS1, file = "TableS1.txt",quote = FALSE, sep="|",row.names = FALSE)
 
 
 
 
+
+
+
+
+
+
+
+# reviewer requests
+
+
+v_sf <- st_as_sf(ventotene2)
+
+
+grid <- v_sf %>% 
+  st_make_grid(cellsize = 10, what = "centers") %>% # grid of points
+  st_intersection(v_sf) 
+
+grid2 <- v_sf %>% 
+  st_make_grid(cellsize = 10, what = "polygons") %>% # grid of points
+  st_intersection(v_sf) 
+
+plot(grid2)
+plot(grid2,add=T)
+
+length(grid)
+length(grid2)
+
+grid3 <- grid2[grid ]
+
+plot(grid2[grid ] )
+
+radpre <- 250
+a_pred   <- radpre*radpre*pi
+bpred  <- gBuffer(as(grid3, 'Spatial'),width=radpre,byid=T)
+
+plot(bpred)
+
+db_pred <- data.frame(build = rep(NA,length(grid)))
+
+for(i in 1:nrow(db_pred)){
+  btrapnosea  <- gIntersection(ventotene2,bpred[i],byid=TRUE)
+  area        <- gArea(btrapnosea)
+  build.buff  <- gIntersection(utm.build,btrapnosea,byid=TRUE)
+  if(length(build.buff)==0){
+    db_pred$build[i] <- 0
+  }else{
+    buildings   <- gArea(build.buff)
+    db_pred$build[i] <- 100*buildings/area}
+}
+
+
+db_pred2 <- expand.grid(build = db_pred$build,
+                        Species = factor(c("Aedes")),
+                        week    = 32)
+
+
+db_pred2$pred <- predict(m2, newdata = db_pred2,type="response")
+
+ggplot(db_pred2, aes(build,pred))+geom_line()
+
+# Extract polygon ID's
+( pid <- sapply(slot(bpred, "polygons"), function(x) slot(x, "ID")) )
+
+# Create dataframe with correct rownames
+db_pred2$ID <- 1:length(bpred)
+row.names(db_pred2) = pid    
+# 
+# dpredsq<- gBuffer(as(grid, 'Spatial'),capStyle="SQUARE")
+# plot(gBuffer(as(grid, 'Spatial'),capStyle="SQUARE"));
+# plot(as(grid, 'Spatial'))
+# plot(dpredsq)
+
+# Try coersion again and check class
+p <- SpatialPolygonsDataFrame(as(grid3, 'Spatial'), db_pred2)
+class(p) 
+
+plot(p,col=p@data$pred)
+
+p.points <- fortify(p, region="ID")
+names(p.points)[6]<-"ID"
+require("plyr")
+p.df <- join(p.points, p@data, by="ID")
+p.df$Species <- factor("Aedes",levels = c("Aedes","Culex"))
+
+
+
+
+db_pred2 <- expand.grid(build = db_pred$build,
+                        Species = factor(c("Culex")),
+                        week    = 32)
+
+
+db_pred2$pred <- predict(m2, newdata = db_pred2,type="response")
+# Extract polygon ID's
+( pid <- sapply(slot(bpred, "polygons"), function(x) slot(x, "ID")) )
+
+# Create dataframe with correct rownames
+db_pred2$ID <- 1:length(bpred)
+row.names(db_pred2) = pid    
+
+ggplot(db_pred2, aes(build,pred))+geom_line()
+p <- SpatialPolygonsDataFrame(as(grid3, 'Spatial'), db_pred2)
+class(p) 
+
+plot(p,col=p@data$pred)
+
+p.points <- fortify(p, region="ID")
+names(p.points)[6]<-"ID"
+p.df2 <- join(p.points, p@data, by="ID")
+p.df2$Species <- factor("Culex",levels = c("Aedes","Culex"))
+df <- bind_rows(p.df,p.df2)
+
+fSupp2 <- ggplot(df,aes(x=long, y=lat, fill=pred)) + facet_wrap(~Species)+ 
+  geom_polygon(colour=NA, size=0.1, aes(group=group))+
+  theme_bw() + theme(legend.position = "top",
+                     panel.grid.major.x = element_blank(),
+                     panel.grid.major.y = element_line(colour = "grey60",linetype = "dashed"),
+                     plot.title = element_text(size = rel(1.5), 
+                                               face = "bold", vjust = 1.5),
+                     axis.title = element_blank(),
+                     axis.text = element_blank(),
+                     strip.background =  element_rect(fill="white"),
+                     strip.text.x = element_text(size=15,face="italic"))+
+  scale_fill_continuous(breaks = c(0,2.5,5,7.5,10),limit=c(0,10))+
+  guides(fill=guide_legend(title="Mean mosquito abundance"))+  coord_quickmap()
+fSupp2
+ggsave(fSupp2, filename = "figSRev2.pdf",width = 7, height = 4,dpi=600)
+
+
+
+dbtemp <- read.csv(paste(here(),"submission","Temp_gaeta_2014.csv",sep="/"),
+                     sep=";",dec=",",header = TRUE, stringsAsFactors = TRUE,
+                   na.strings ="---")
+
+str(dbtemp)
+
+dbtemp$mean <- (dbtemp$max - dbtemp$min)/2
+
+ftmp <- dbtemp %>% filter(month %in% c(5,6,7,8,9)) %>%
+  ggplot(.,aes(ï..Day,mean))+facet_wrap(~month,ncol=5) +
+  geom_line()+geom_point()+xlab("Day")+ylab("Mean temperature (°C)")+
+  theme_bw() + theme(plot.title = element_text(size = rel(1.5), 
+                                               face = "bold", vjust = 1.5),
+                     strip.background =  element_rect(fill="white"),
+                     strip.text.x = element_text(size=15,face="italic"))
+
+
+
+
+
+
+
+
+dbrain <- read.csv(paste(here(),"submission","rain_gaeta_2014.csv",sep="/"),
+                   sep=";",dec=",",header = TRUE, stringsAsFactors = TRUE,
+                   na.strings ="---")
+
+str(dbrain)
+
+
+frain <- dbrain %>% pivot_longer(., cols = Gennaio:Dicembre, names_to = "month",values_to = "rain")%>%
+  filter(month %in% c("Maggio","Giugno","Luglio","Agosto","Settembre")) %>%
+  transform(month = case_when(month == "Maggio" ~5,
+                              month == "Giugno"~6,
+                              month == "Luglio"~7,
+                              month == "Agosto"~8,
+                              month == "Settembre"~9))%>%
+  ggplot(.,aes(ï..giorno,rain))+facet_wrap(~month,ncol=5) +
+  geom_bar(stat="identity")+xlab("Day")+ylab("Rain (mm)")+
+  theme_bw() + theme(plot.title = element_text(size = rel(1.5), 
+                                               face = "bold", vjust = 1.5),
+                     strip.background =  element_rect(fill="white"),
+                     strip.text.x = element_text(size=15,face="italic"))
+
+library(gridExtra)
+fmeteo <- grid.arrange(ftmp,frain)
+
+ggsave(fmeteo, filename = paste(here(),"submission","figSRev3.pdf",sep="/") ,width = 9, height = 6,dpi=600)
